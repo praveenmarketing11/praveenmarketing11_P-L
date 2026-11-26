@@ -1,0 +1,674 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Restaurant Profit Dashboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: sticky ink bar with live net profit; inputs on the left, live dashboard on the right (stacked on phones). */
+:root{
+  --bg:#F1F2F7; --surface:#FFFFFF; --surface-2:#F5F6FB; --ink:#151936; --muted:#5B6285;
+  --line:#E0E3EF; --line-strong:#C9CEE2;
+  --brand:#2B3490; --on-brand:#FFFFFF;
+  --accent:#F2A516; --on-accent:#2A1D00;
+  --good:#13805A; --good-soft:#DDF2E9; --warn:#B4540A; --warn-soft:#FBE9D8; --bad:#C0283A; --bad-soft:#FBE0E3; --info-soft:#E4E7FA;
+  --bar-bg:#151936; --bar-ink:#FFFFFF; --hero-bg:#1B2160; --hero-ink:#FFFFFF; --hero-muted:#B7BEEA;
+  --c-app:#E08A2E; --c-food:#C2456A; --c-over:#4A55C2; --c-profit:#1FA374;
+  --shadow:0 1px 2px rgba(21,25,54,.06),0 10px 28px -14px rgba(21,25,54,.22);
+  --f-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --f-body:'Hanken Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0C0F24; --surface:#151A3A; --surface-2:#1B2147; --ink:#EEF0FB; --muted:#9EA5CC;
+  --line:#262D5C; --line-strong:#343C75; --brand:#8C98FF; --on-brand:#0C0F24;
+  --accent:#F5B53A; --good:#4FD6A0; --good-soft:#12372D; --warn:#F2A65A; --warn-soft:#3B2A15; --bad:#FF7C8A; --bad-soft:#3E1B25; --info-soft:#232B63;
+  --bar-bg:#070919; --hero-bg:#1A2050; --hero-muted:#A9B1E0;
+  --c-app:#F0A04B; --c-food:#E0698C; --c-over:#8C98FF; --c-profit:#3FCB97;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C0F24; --surface:#151A3A; --surface-2:#1B2147; --ink:#EEF0FB; --muted:#9EA5CC;
+  --line:#262D5C; --line-strong:#343C75; --brand:#8C98FF; --on-brand:#0C0F24;
+  --accent:#F5B53A; --good:#4FD6A0; --good-soft:#12372D; --warn:#F2A65A; --warn-soft:#3B2A15; --bad:#FF7C8A; --bad-soft:#3E1B25; --info-soft:#232B63;
+  --bar-bg:#070919; --hero-bg:#1A2050; --hero-muted:#A9B1E0;
+  --c-app:#F0A04B; --c-food:#E0698C; --c-over:#8C98FF; --c-profit:#3FCB97;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.6); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bar-bg)}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* top bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bar-bg);color:var(--bar-ink)}
+.bar-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:12px;padding-block:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:18px;flex:none}
+.bar-title{font-family:var(--f-display);font-weight:700;font-size:17px;white-space:nowrap}
+.live{margin-left:auto;display:flex;align-items:baseline;gap:8px;min-width:0}
+.live small{color:var(--hero-muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.live b{font-family:var(--f-display);font-size:20px;font-weight:700;white-space:nowrap}
+.live b.pos{color:#5BE0AE}.live b.neg{color:#FF8D99}
+.btn{border:1px solid transparent;border-radius:10px;padding:8px 14px;font-weight:600;font-size:14px;line-height:1.2;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-accent{background:var(--accent);color:var(--on-accent)}
+.btn-accent:hover{filter:brightness(1.06)}
+.btn-ghost{background:rgba(255,255,255,.1);color:var(--bar-ink);border-color:rgba(255,255,255,.18)}
+.btn-ghost:hover{background:rgba(255,255,255,.18)}
+.btn-line{background:var(--surface);border-color:var(--line-strong);color:var(--ink)}
+.btn-line:hover{border-color:var(--brand)}
+.btn[disabled]{opacity:.6;cursor:progress}
+.short{display:none}
+
+/* page */
+.wrap{max-width:1240px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.intro{margin-bottom:22px}
+.intro h1{font-size:clamp(28px,4.4vw,42px);font-weight:700;line-height:1.05}
+.intro p{margin:8px 0 0;color:var(--muted);max-width:60ch}
+.grid{display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:24px;align-items:start}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);min-width:0}
+.card.flat{box-shadow:none;background:var(--surface-2)}
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:6px 0 2px}
+.sec-h{font-size:19px;font-weight:700}
+.sub{color:var(--muted);font-size:13.5px;margin:2px 0 0}
+
+/* inputs */
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field .lbl{font-size:13.5px;font-weight:600}
+.field small{color:var(--muted);font-size:12.5px;line-height:1.4}
+.inp{display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:10px;padding:0 12px;min-width:0}
+.inp:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 22%,transparent)}
+.inp i{font-style:normal;color:var(--muted);font-size:14px}
+.inp input,.inp select{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:16px;font-weight:500;padding:10px 0;outline:none;font-variant-numeric:tabular-nums}
+.inp input::placeholder{color:var(--muted);opacity:.6}
+.inp select{padding:10px 0}
+.stack{display:flex;flex-direction:column;gap:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ch-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ch-head h3{font-size:17px;font-weight:700}
+.name-inp{font:inherit;font-family:var(--f-display);font-weight:700;font-size:17px;color:var(--ink);background:transparent;border:0;border-bottom:1px dashed var(--line-strong);padding:2px 0;min-width:0;width:100%;outline:none}
+.x{border:0;background:transparent;color:var(--muted);width:30px;height:30px;border-radius:8px;font-size:18px;line-height:1;flex:none}
+.x:hover{background:var(--surface-2);color:var(--bad)}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;border-radius:8px;padding:8px 6px;font-size:13.5px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(21,25,54,.14)}
+.feeline{margin:0;font-size:13px;color:var(--muted)}
+.linkbtn{border:0;background:none;color:var(--brand);font-weight:700;padding:0 2px;text-decoration:underline;text-underline-offset:3px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13.5px;font-weight:600}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.chip::before{content:"+ ";color:var(--brand)}
+.food-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.food-opts button{text-align:left;border:1.5px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}
+.food-opts button b{font-size:14px}.food-opts button span{font-size:12px;color:var(--muted)}
+.food-opts button[aria-pressed="true"]{border-color:var(--brand);background:var(--surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 16%,transparent)}
+.foodlive{font-size:13.5px;border-top:1px solid var(--line);padding-top:12px}
+.oh-row{display:grid;grid-template-columns:1fr minmax(120px,150px) 30px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.oh-row:last-of-type{border-bottom:0}
+.oh-row .nm{font-weight:600}
+.oh-total{display:flex;justify-content:space-between;align-items:center;background:var(--info-soft);border-radius:12px;padding:12px 14px;font-weight:700;margin-top:6px}
+.add-line{border:1px dashed var(--line-strong);background:transparent;border-radius:10px;padding:9px 12px;color:var(--brand);font-weight:700;text-align:left;margin-top:6px}
+.add-line span{color:var(--muted);font-weight:500}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+
+/* results */
+.hero{background:var(--hero-bg);color:var(--hero-ink);border-radius:18px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(242,165,22,.28),transparent 68%);pointer-events:none}
+.hero .eyebrow{color:var(--hero-muted);margin:0}
+.hero-top{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.hero-num{font-family:var(--f-display);font-weight:800;font-size:clamp(40px,7vw,64px);line-height:1.05;letter-spacing:-.02em;margin-top:6px}
+.hero-sub{color:var(--hero-muted);margin-top:2px}
+.hero-msg{margin:14px 0 0;font-weight:600;max-width:60ch}
+.hero-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:18px}
+.hero-meta div{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 12px}
+.hero-meta small{display:block;color:var(--hero-muted);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.hero-meta b{font-family:var(--f-display);font-size:18px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 11px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.info{background:var(--info-soft);color:var(--brand)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.tile small{display:block;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tile b{display:block;font-family:var(--f-display);font-size:24px;font-weight:700;margin-top:2px;overflow-wrap:anywhere}
+.tile span{font-size:13px;color:var(--muted)}
+.tile.warn b{color:var(--warn)}.tile.bad b{color:var(--bad)}.tile.good b{color:var(--good)}
+.splitbar{display:flex;height:22px;border-radius:7px;overflow:hidden;background:var(--surface-2);margin:14px 0 12px;gap:2px}
+.splitbar i{display:block;min-width:2px}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
+.legend div{display:flex;gap:8px;align-items:flex-start;font-size:13.5px}
+.legend em{width:11px;height:11px;border-radius:3px;margin-top:5px;flex:none}
+.legend b{display:block;font-family:var(--f-display);font-size:17px;line-height:1.2}
+.legend span{color:var(--muted);font-size:12.5px}
+.ins-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px}
+.ins .pill{align-self:flex-start}
+.ins{border:1px solid var(--line);background:var(--surface-2);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ins h3{font-size:15.5px;font-weight:700}
+.ins p{margin:0;font-size:14px;color:var(--muted)}
+.two-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px;align-items:start}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl td,.tbl th{padding:8px 0 8px 10px;white-space:nowrap;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;vertical-align:middle}
+.tbl td:first-child,.tbl th:first-child{text-align:left;padding-left:0;white-space:normal}
+.tbl th{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.tbl .p{color:var(--muted);font-size:12.5px;width:62px}
+.tbl .grp td{border-bottom:0;padding-top:14px;font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tbl .ind td:first-child{padding-left:12px}
+.tbl .tot td{font-weight:700}
+.tbl .neg{color:var(--bad)}
+.tbl .final td{background:var(--good-soft);color:var(--good);font-weight:800;font-size:15.5px;border-bottom:0}
+.tbl .final.loss td{background:var(--bad-soft);color:var(--bad)}
+.tbl .final td:first-child{padding-left:10px;border-radius:10px 0 0 10px}.tbl .final td:last-child{padding-right:10px;border-radius:0 10px 10px 0}
+.note{font-size:12.5px;color:var(--muted);margin:12px 0 0}
+.scroll{overflow-x:auto}
+.keep{display:flex;align-items:center;gap:10px;min-width:170px}
+.keep .tr{flex:1;height:9px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.keep .tr i{display:block;height:100%;background:var(--brand);border-radius:6px}
+.keep b{width:48px;text-align:right}
+.bd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.bd h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.bd dl{margin:0}
+.bd dl div{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:13.5px}
+.bd dt{color:var(--muted)}.bd dd{margin:0;font-variant-numeric:tabular-nums}
+.bd .neg{color:var(--bad)}.bd .strong dt,.bd .strong dd{font-weight:700;color:var(--ink)}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--bar-bg);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:40;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+#copybox{width:100%;min-height:150px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);font:13px/1.5 ui-monospace,Menlo,monospace;padding:10px}
+
+@media (max-width:980px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.long{display:none}.short{display:inline}.bar-title{display:none}.live b{font-size:18px}.hero{padding:18px}.card{padding:15px}}
+@media (prefers-reduced-motion:no-preference){.hero-num{transition:color .2s}}
+</style>
+
+<header class="bar">
+  <div class="bar-in">
+    <div class="logo" aria-hidden="true">₹</div>
+    <div class="bar-title">Profit / Loss</div>
+    <div class="live"><small>Net profit</small><b id="liveNet" class="num">₹0</b></div>
+    <button class="btn btn-ghost" id="copyBtn" type="button"><span class="long">Copy summary</span><span class="short">Copy</span></button>
+    <button class="btn btn-accent" id="pdfBtn" type="button"><span class="long">Download PDF</span><span class="short">PDF</span></button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <h1>Where your money goes, channel by channel</h1>
+    <p>Enter last month's numbers top to bottom like a real P&amp;L: sales, food cost, then running costs. The dashboard updates as you type.</p>
+  </div>
+  <div class="grid">
+    <div class="col" id="inputs"></div>
+    <div class="col" id="results" aria-live="polite"></div>
+  </div>
+  <div id="copywrap" class="card" hidden style="margin-top:16px">
+    <p class="sub" style="margin-bottom:8px">Copying was blocked here. Select the text below and copy it.</p>
+    <textarea id="copybox" readonly></textarea>
+  </div>
+</main>
+<div id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+'use strict';
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const n=v=>{const x=parseFloat(String(v).replace(/,/g,''));return isFinite(x)?x:0};
+const nf=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0});
+const nf1=new Intl.NumberFormat('en-IN',{minimumFractionDigits:1,maximumFractionDigits:1});
+const rnd=v=>Math.round(v);
+const money=v=>(rnd(v)<0?'−':'')+'₹'+nf.format(Math.abs(rnd(v)));
+const pmoney=v=>(rnd(v)<0?'-':'')+'Rs '+nf.format(Math.abs(rnd(v)));
+const m1=v=>'₹'+nf1.format(v), pm1=v=>'Rs '+nf1.format(v);
+const pct=(v,d=1)=>v.toFixed(d)+'%';
+const div=(a,b)=>b?a/b:0;
+let uid=0;const nid=()=>'i'+(++uid);
+
+/* ---------- state ---------- */
+const PRESETS={
+  zomato:{name:'Zomato',comm:25,pay:1.93,gstf:18,tds:.1,base:'net'},
+  swiggy:{name:'Swiggy',comm:24,pay:2,gstf:18,tds:.1,base:'gross'},
+  ownly:{name:'Ownly',comm:15,pay:2,gstf:18,tds:.1,base:'net'},
+  magicpin:{name:'magicpin',comm:15,pay:2,gstf:18,tds:.1,base:'net'},
+  toing:{name:'Toing',comm:15,pay:2,gstf:18,tds:.1,base:'net'},
+  ondc:{name:'ONDC',comm:8,pay:2,gstf:18,tds:.1,base:'net'},
+  website:{name:'Own website / app',comm:0,pay:2,gstf:18,tds:.1,base:'net'},
+  other:{name:'Other channel',comm:15,pay:2,gstf:18,tds:.1,base:'net'}
+};
+const ADD_ORDER=['zomato','swiggy','ownly','magicpin','toing','ondc','website','other'];
+const mkCh=(key,sales=0)=>Object.assign({id:nid(),key,sales,mode:'pct',payout:0,offers:0,open:false},PRESETS[key]);
+function periodLabel(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toLocaleString('en-IN',{month:'long',year:'numeric'})}
+const FIXED=['Rent','Salaries','Utilities','Marketing','Other'];
+function example(){return{name:'',period:periodLabel(),counter:240000,
+  channels:[mkCh('zomato',90000),mkCh('swiggy',60000)],
+  foodMode:'pct',foodPct:40,purchases:135000,opening:0,closing:0,
+  overheads:[45000,70000,15000,5000,10000].map((a,i)=>({id:nid(),name:FIXED[i],amt:a,fixed:true})),
+  bill:250,target:50000,days:30}}
+function blank(){const s=example();s.counter=0;s.channels.forEach(c=>c.sales=0);s.purchases=0;s.overheads.forEach(o=>o.amt=0);s.bill=0;s.target=0;return s}
+let S=example();
+
+/* ---------- calculation ---------- */
+function calc(s){
+  const counter=n(s.counter);
+  const chs=s.channels.map(c=>{
+    const sales=n(c.sales),exg=sales/1.05,gst=sales-exg;
+    const o={id:c.id,name:c.name,mode:c.mode,sales,gst,comm:0,payfee:0,gstf:0,tds:0,offers:0};
+    if(c.mode==='pct'){
+      const base=c.base==='gross'?sales:exg;
+      o.comm=base*n(c.comm)/100;o.payfee=sales*n(c.pay)/100;
+      o.gstf=(o.comm+o.payfee)*n(c.gstf)/100;o.tds=exg*n(c.tds)/100;
+      o.fees=gst+o.comm+o.payfee+o.gstf+o.tds;o.offers=n(c.offers);o.payPre=sales-o.fees;
+    }else{o.payPre=n(c.payout);o.fees=sales-o.payPre}
+    o.ded=o.fees+o.offers;o.payout=o.payPre-o.offers;return o;
+  });
+  const appSales=chs.reduce((a,c)=>a+c.sales,0),appDed=chs.reduce((a,c)=>a+c.ded,0);
+  const revenue=counter+appSales,payoutTotal=counter+chs.reduce((a,c)=>a+c.payout,0);
+  const foodBase=counter+chs.reduce((a,c)=>a+c.payPre,0);
+  const food=s.foodMode==='pct'?foodBase*n(s.foodPct)/100:n(s.purchases)+n(s.opening)-n(s.closing);
+  chs.forEach(c=>{c.food=div(c.payPre,foodBase)*food;c.contrib=c.payout-c.food;c.keep=div(c.contrib,c.sales)*100});
+  const counterFood=div(counter,foodBase)*food,counterContrib=counter-counterFood;
+  const contrib=payoutTotal-food;
+  const over=s.overheads.reduce((a,o)=>a+n(o.amt),0);
+  const net=contrib-over,cm=div(contrib,revenue);
+  const bill=n(s.bill),days=Math.max(1,n(s.days)||30),target=n(s.target);
+  const reqContrib=over+target;
+  const reqSales=cm>0?reqContrib/cm:null;
+  const reqOrders=reqSales!==null&&bill>0?Math.ceil(reqSales/bill):null;
+  const reqPerDay=reqOrders!==null?Math.ceil(reqOrders/days):null;
+  const beSales=cm>0?over/cm:null;
+  const rows=[{name:'Counter (dine-in & takeaway)',short:'Counter',sales:counter,ded:0,contrib:counterContrib,keep:div(counterContrib,counter)*100,counter:true}]
+    .concat(chs.map(c=>({name:c.name,short:c.name,sales:c.sales,ded:c.ded,contrib:c.contrib,keep:c.keep})));
+  return{counter,chs,rows,appSales,appDed,revenue,payoutTotal,foodBase,food,foodPctNet:div(food,foodBase)*100,counterFood,counterContrib,contrib,over,net,netMargin:div(net,revenue)*100,cm,bill,days,target,reqContrib,reqSales,reqOrders,reqPerDay,beSales}
+}
+function foodStatus(p){
+  if(p<=0)return{t:'',tone:'info'};
+  if(p<28)return{t:'very lean, check portions and quality',tone:'info'};
+  if(p<=35)return{t:'healthy',tone:'good'};
+  if(p<=42)return{t:'a little high',tone:'warn'};
+  return{t:'high',tone:'bad'}
+}
+
+/* ---------- insights (plain text; m = money formatter, m1f = 1-decimal money) ---------- */
+function insights(r,s,m,m1f){
+  const out=[];const cur=m===pmoney?'Rs ':'\u20B9';
+  // break-even
+  if(r.cm>0&&r.revenue>0){
+    const be=r.beSales,perDay=r.bill>0?Math.ceil(be/r.bill/r.days):null,cush=(r.revenue-be)/r.revenue*100;
+    let t='You break even at '+m(be)+' of sales a month'+(perDay?', about '+perDay+' orders a day':'')+'. ';
+    t+=r.revenue>=be?'This month\'s sales are '+pct(cush)+' above that, so sales can fall by that much before you make a loss.':'This month\'s sales are '+m(be-r.revenue)+' short of that.';
+    out.push({tone:cush>=25?'good':cush>=10?'warn':'bad',title:'Break-even and cushion',text:t});
+  }else if(r.revenue>0){
+    out.push({tone:'bad',title:'Every sale is losing money',text:'After app fees and food cost, nothing is left to pay overheads. Check food cost and app fees first.'});
+  }
+  // channels
+  const act=r.rows.filter(x=>x.sales>0);
+  if(act.length>=2){
+    const best=act.reduce((a,b)=>b.keep>a.keep?b:a),worst=act.reduce((a,b)=>b.keep<a.keep?b:a);
+    if(best!==worst){
+      const gain=(best.keep-worst.keep)/100*10000;
+      out.push({tone:best.keep-worst.keep>15?'warn':'info',title:'Most and least profitable channel',
+        text:best.short+' keeps '+m1f(best.keep)+' of every '+cur+'100 customers pay. '+worst.short+' keeps '+m1f(worst.keep)+'. Moving '+cur+'10,000 of '+worst.short+' orders to '+best.short+' adds about '+m(gain)+' a month.'});
+    }
+  }
+  // app take
+  if(r.appSales>0){
+    const share=r.appSales/r.revenue*100,take=r.appDed/r.appSales*100;
+    out.push({tone:take>30||share>50?'warn':'info',title:'What the apps take',
+      text:'Delivery apps bring '+pct(share)+' of your sales and take '+m(r.appDed)+' ('+pct(take)+' of what their customers pay) as commission, fees, GST and TDS.'+(share>50?' More than half your sales depend on apps.':'')});
+  }
+  // food cost
+  if(r.foodBase>0){
+    const p=r.foodPctNet,st=foodStatus(p);
+    let t='Food cost is '+pct(p)+' of net payout'+(st.t?' ('+st.t+')':'')+'. Each point you cut adds about '+m(r.foodBase*0.01)+' a month.';
+    if(p>35)t+=' Reaching 35% would add '+m(r.food-0.35*r.foodBase)+'.';
+    out.push({tone:st.tone,title:'Food cost',text:t});
+  }
+  // prime cost
+  const sal=S.overheads.filter(o=>/salar|wage|staff|labou?r|payroll/i.test(o.name)).reduce((a,o)=>a+n(o.amt),0);
+  if(sal>0&&r.revenue>0){
+    const prime=(r.food+sal)/r.revenue*100;
+    out.push({tone:prime<=60?'good':prime<=65?'warn':'bad',title:'Prime cost',text:'Food cost plus salaries is '+pct(prime)+' of revenue. Restaurants commonly aim to stay under 60%.'});
+  }else if(r.over>0&&r.revenue>0){
+    const top=S.overheads.reduce((a,o)=>n(o.amt)>n(a.amt)?o:a,S.overheads[0]);
+    out.push({tone:'info',title:'Biggest running cost',text:top.name+' is your largest overhead at '+pct(n(top.amt)/r.revenue*100)+' of revenue.'});
+  }
+  // price lever
+  if(r.foodBase>0){
+    const g=0.05*r.foodBase;
+    out.push({tone:'info',title:'Price lever',text:'A 5% price increase, if orders hold steady, adds about '+m(g)+' profit a month'+(r.net>0?' ('+pct(g/r.net*100,0)+' more than now)':'')+'.'});
+  }
+  return out;
+}
+const TONE_LABEL={good:'On track',warn:'Watch',bad:'Needs attention',info:'Tip'};
+
+/* ---------- inputs panel ---------- */
+const fld=(label,attrs,o={})=>{
+  const v=o.val?o.val:'';
+  return `<label class="field"><span class="lbl">${label}</span><span class="inp">${o.prefix===''?'':`<i>${o.prefix||'₹'}</i>`}<input inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(v)}" ${attrs}>${o.suffix?`<i>${o.suffix}</i>`:''}</span>${o.hint?`<small>${o.hint}</small>`:''}</label>`};
+const chAttr=(c,f)=>`id="${c.id}-${f}" data-scope="ch" data-id="${c.id}" data-f="${f}"`;
+
+function chCard(c){
+  const title=c.key==='other'
+    ?`<input class="name-inp" id="${c.id}-name" data-scope="ch" data-id="${c.id}" data-f="name" data-text="1" value="${esc(c.name)}" aria-label="Channel name">`
+    :`<h3>${esc(c.name)}</h3>`;
+  let body=fld('Sales — what customers paid (incl. GST)',chAttr(c,'sales'),{val:c.sales});
+  body+=`<div class="seg" role="group" aria-label="Fee entry mode"><button type="button" data-act="mode" data-id="${c.id}" data-v="pct" aria-pressed="${c.mode==='pct'}">Fees as %</button><button type="button" data-act="mode" data-id="${c.id}" data-v="payout" aria-pressed="${c.mode==='payout'}">Payout I received</button></div>`;
+  if(c.mode==='pct'){
+    body+=`<p class="feeline">Commission ${n(c.comm)}% · payment fee ${n(c.pay)}% · GST on fees ${n(c.gstf)}% · TDS ${n(c.tds)}% <button type="button" class="linkbtn" data-act="edit" data-id="${c.id}">${c.open?'Done':'Edit'}</button></p>`;
+    if(c.open){
+      body+=`<div class="two">${fld('Commission',chAttr(c,'comm'),{val:c.comm,prefix:'',suffix:'%'})}${fld('Payment fee',chAttr(c,'pay'),{val:c.pay,prefix:'',suffix:'%'})}${fld('GST on fees',chAttr(c,'gstf'),{val:c.gstf,prefix:'',suffix:'%'})}${fld('TDS',chAttr(c,'tds'),{val:c.tds,prefix:'',suffix:'%'})}</div>
+      <label class="field"><span class="lbl">Commission is charged on</span><span class="inp"><select ${chAttr(c,'base')} data-text="1"><option value="net"${c.base==='net'?' selected':''}>Sales excluding GST</option><option value="gross"${c.base==='gross'?' selected':''}>Full bill including GST</option></select></span></label>`;
+    }
+    body+=fld('Offers you paid for, ads &amp; other charges',chAttr(c,'offers'),{val:c.offers,hint:'From the statement: discounts you funded, ad spend taken from payouts, penalties. Leave out anything already taken off the sales figure.'});
+  }else{
+    body+=fld('Payout received (what landed in your bank)',chAttr(c,'payout'),{val:c.payout,hint:'Offers, ads and fees are already inside this figure.'});
+  }
+  return `<div class="card flat"><div class="stack"><div class="ch-head">${title}<button type="button" class="x" data-act="rm-ch" data-id="${c.id}" aria-label="Remove ${esc(c.name)}">×</button></div>${body}</div></div>`;
+}
+
+function renderInputs(focusId){
+  const present=new Set(S.channels.map(c=>c.key));
+  const chips=ADD_ORDER.filter(k=>k==='other'||!present.has(k)).map(k=>`<button type="button" class="chip" data-act="add-ch" data-key="${k}">${k==='other'?'Other…':esc(PRESETS[k].name)}</button>`).join('');
+  const oh=S.overheads.map(o=>`<div class="oh-row">${o.fixed?`<span class="nm">${esc(o.name)}</span>`:`<input class="name-inp" id="${o.id}-n" data-scope="oh" data-id="${o.id}" data-f="name" data-text="1" value="${esc(o.name)}" aria-label="Expense name" placeholder="Expense name">`}
+    <span class="inp"><i>₹</i><input inputmode="decimal" autocomplete="off" placeholder="0" id="${o.id}-a" data-scope="oh" data-id="${o.id}" data-f="amt" value="${o.amt?esc(o.amt):''}" aria-label="${esc(o.name)} amount"></span>
+    ${o.fixed?'<span></span>':`<button type="button" class="x" data-act="rm-oh" data-id="${o.id}" aria-label="Remove expense">×</button>`}</div>`).join('');
+  const foodBody=S.foodMode==='pct'
+    ?fld('Food cost %','id="foodPct" data-scope="root" data-f="foodPct"',{val:S.foodPct,prefix:'',suffix:'%',hint:'Taken on what reaches you after the apps\' cut. If your app prices match your counter prices, use "What I bought" for an exact figure.'})
+    :`<div class="stack">${fld('Food purchases this month','id="purchases" data-scope="root" data-f="purchases"',{val:S.purchases,hint:'Meat, vegetables, dairy, oil, masala, bread and similar.'})}<div class="two">${fld('Opening stock','id="opening" data-scope="root" data-f="opening"',{val:S.opening})}${fld('Closing stock','id="closing" data-scope="root" data-f="closing"',{val:S.closing})}</div></div>`;
+  $('#inputs').innerHTML=`
+  <section class="card"><div class="stack">
+    <div class="ch-head"><h2 class="sec-h">Report details</h2><div class="tools"><button type="button" class="btn btn-line" data-act="clear">Clear all</button><button type="button" class="btn btn-line" data-act="example">Load example</button></div></div>
+    <div class="two"><label class="field"><span class="lbl">Restaurant name</span><span class="inp"><input id="rname" data-scope="root" data-f="name" data-text="1" placeholder="Your restaurant" value="${esc(S.name)}"></span></label>
+    <label class="field"><span class="lbl">Period</span><span class="inp"><input id="rperiod" data-scope="root" data-f="period" data-text="1" value="${esc(S.period)}"></span></label></div>
+  </div></section>
+  <section class="card"><div class="stack">
+    <div><div class="eyebrow">Actual sales by channel</div></div>
+    <div class="card flat"><div class="stack"><h3 class="sec-h" style="font-size:17px">Counter (dine-in &amp; takeaway)</h3>${fld('Sales (without GST)','id="counter" data-scope="root" data-f="counter"',{val:S.counter,hint:'If you charge 5% GST, leave it out: it goes to the government, not to you.'})}</div></div>
+    ${S.channels.map(chCard).join('')}
+    <div class="eyebrow" style="margin-top:6px">Add a channel</div><div class="chips">${chips}</div>
+    <p class="sub">On the apps, enter what customers paid for your food, including 5% GST (as in the app's report). Fee defaults for added channels are estimates, so check them against your statement. Not sure of an app's fees? Switch it to "Payout I received" and type what landed in your bank.</p>
+  </div></section>
+  <section class="card"><div class="stack">
+    <div><div class="eyebrow">Food cost (COGS)</div><p class="sub">Usually your biggest cost. The more exact this is, the more your P&amp;L means.</p></div>
+    <div class="food-opts"><button type="button" data-act="food" data-v="buy" aria-pressed="${S.foodMode==='buy'}"><b>What I bought</b><span>Recommended</span></button><button type="button" data-act="food" data-v="pct" aria-pressed="${S.foodMode==='pct'}"><b>My food cost %</b><span>Quick estimate</span></button></div>
+    ${foodBody}<div class="foodlive" id="foodLive"></div>
+  </div></section>
+  <section class="card"><div>
+    <div class="eyebrow">Overheads (monthly)</div>${oh}
+    <button type="button" class="add-line" data-act="add-oh" style="width:100%">+ Add an expense <span>gas, packaging, EMI…</span></button>
+    <div class="oh-total"><span>Total overheads</span><span class="num" id="ohTotal"></span></div>
+  </div></section>
+  <section class="card"><div class="stack">
+    <div class="eyebrow">Targets</div>
+    <div class="two">${fld('Average bill value','id="bill" data-scope="root" data-f="bill"',{val:S.bill,hint:'For orders a day'})}${fld('Target profit / month','id="target" data-scope="root" data-f="target"',{val:S.target,hint:'Optional'})}</div>
+    ${fld('Days open per month','id="days" data-scope="root" data-f="days"',{val:S.days,prefix:''})}
+  </div></section>`;
+  if(focusId){const el=document.getElementById(focusId);if(el)el.focus()}
+}
+
+/* ---------- results ---------- */
+const negm=v=>rnd(v)===0?'\u20B90':'\u2212\u20B9'+nf.format(Math.abs(rnd(v)));
+function tableRow(l,p,a,o={}){
+  const cls=[o.ind?'ind':'',o.tot?'tot':'',o.final?'final'+(a<0?' loss':''):''].filter(Boolean).join(' ');
+  return `<tr class="${cls}"><td>${esc(l)}</td><td class="p">${p===null?'':pct(p)}</td><td class="${o.neg?'neg':''}">${o.neg?negm(a):money(a)}</td></tr>`}
+
+function renderResults(){
+  const r=calc(S);
+  $('#liveNet').textContent=money(r.net);$('#liveNet').className='num '+(r.net>=0?'pos':'neg');
+  $('#ohTotal').textContent=money(r.over);
+  // food live line
+  const fs=foodStatus(r.foodPctNet);
+  const fl=$('#foodLive');
+  if(fl)fl.innerHTML=`<b class="num">${money(r.food)}</b> = <b class="num" style="color:var(--${fs.tone==='info'?'brand':fs.tone})">${pct(r.foodPctNet)} of your net payout</b>${fs.t?' · '+fs.t:''} · most restaurants aim for 28–35%`;
+  const R=$('#results');
+  if(r.revenue<=0){R.innerHTML=`<div class="card empty"><h2 class="sec-h">Enter your sales to see the dashboard</h2><p>Start with counter sales, then add Zomato, Swiggy or any other channel.</p></div>`;return r}
+  const tgt=r.target>0;
+  let tone,chip,msg;
+  if(r.net<0){tone='bad';chip='Loss';msg='You are running at a loss of '+money(-r.net)+' this period. The insights below show where to look first.'}
+  else if(!tgt||r.net>=r.target){tone='good';chip=tgt?'On target':'Profitable';msg=tgt?'Great, you\'re profitable and at or above your target. Keep it up!':'You\'re profitable this period.'}
+  else{tone='warn';chip='Below target';msg='Profitable, but '+money(r.target-r.net)+' short of your '+money(r.target)+' target.'}
+  const cushion=r.beSales!==null&&r.revenue>0?(r.revenue-r.beSales)/r.revenue*100:null;
+  const per=v=>div(v,r.revenue)*100;
+  const segs=[['App deductions',r.appDed,'--c-app'],['Food cost',r.food,'--c-food'],['Overheads',r.over,'--c-over'],['Profit',Math.max(r.net,0),'--c-profit']];
+  const tot=segs.reduce((a,x)=>a+Math.max(x[1],0),0)||1;
+  const bar=segs.map(x=>`<i title="${x[0]}" style="width:${Math.max(x[1],0)/tot*100}%;background:var(${x[2]})"></i>`).join('');
+  const legend=segs.map(x=>`<div><em style="background:var(${x[2]})"></em><div><span>${x[0]}</span><b class="num">₹${nf1.format(x[0]==='Profit'?per(r.net):per(x[1]))}</b></div></div>`).join('');
+  const ins=insights(r,S,money,m1);
+  const insHtml=ins.map(i=>`<article class="ins"><span class="pill ${i.tone}">${TONE_LABEL[i.tone]}</span><h3>${esc(i.title)}</h3><p>${esc(i.text)}</p></article>`).join('');
+
+  const appRows=r.chs.map(c=>tableRow(c.name,div(c.ded,c.sales)*100,c.ded,{ind:1,neg:1})).join('');
+  const revRows=[tableRow('Counter (dine-in & takeaway)',per(r.counter),r.counter,{ind:1})].concat(r.chs.map(c=>tableRow(c.name,per(c.sales),c.sales,{ind:1}))).join('');
+  const ohRows=S.overheads.map(o=>tableRow(o.name||'Expense',per(n(o.amt)),n(o.amt),{ind:1,neg:1})).join('');
+  const pl=`<table class="tbl"><tbody>
+    <tr class="grp"><td colspan="3">Revenue</td></tr>${revRows}${tableRow('Total revenue',100,r.revenue,{tot:1})}
+    ${r.chs.length?`<tr class="grp"><td colspan="3">App deductions</td></tr>${appRows}${tableRow('Total app deductions',div(r.appDed,r.appSales)*100,r.appDed,{tot:1,neg:1})}`:''}
+    ${tableRow('Net payout',per(r.payoutTotal),r.payoutTotal,{tot:1})}${tableRow('Food cost',r.foodPctNet,r.food,{ind:1,neg:1})}${tableRow('Contribution',per(r.contrib),r.contrib,{tot:1})}
+    <tr class="grp"><td colspan="3">Overheads</td></tr>${ohRows}${tableRow('Total overheads',per(r.over),r.over,{tot:1,neg:1})}
+    ${tableRow('Net profit / loss',r.netMargin,r.net,{final:1})}</tbody></table>
+    <p class="note">Contribution margin <b>${pct(r.cm*100,2)}</b> · Net profit margin <b>${pct(r.netMargin,2)}</b><br>% column: share of total revenue. App deductions show the share of that app's own sales; food cost is on net payout.</p>`;
+
+  const target=`<table class="tbl"><tbody>
+    <tr><td>Target profit</td><td><b>${money(r.target)}</b></td></tr>
+    <tr><td>Required contribution (overheads + target)</td><td><b>${money(r.reqContrib)}</b></td></tr>
+    <tr><td>Required sales / month</td><td><b>${r.reqSales!==null?money(r.reqSales):'—'}</b></td></tr>
+    <tr><td>Required orders / month</td><td><b>${r.reqOrders!==null?nf.format(r.reqOrders):'—'}</b></td></tr>
+    <tr><td>Required orders / day</td><td><b>${r.reqPerDay!==null?nf.format(r.reqPerDay):'—'}</b></td></tr></tbody></table>
+    <p class="note">Includes what the apps keep, so it's higher than a break-even that counts every order as a counter sale.</p>`;
+
+  const keepRows=r.rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${money(x.sales)}</td><td class="${x.ded?'neg':''}">${x.ded?'−'+money(x.ded).replace('−',''):'—'}</td><td>${money(x.contrib)}</td><td><div class="keep"><span class="tr"><i style="width:${Math.max(0,Math.min(100,x.keep))}%"></i></span><b>₹${nf1.format(x.keep)}</b></div></td></tr>`).join('');
+  const keep=`<div class="scroll"><table class="tbl"><thead><tr><th>Channel</th><th>Sales</th><th>App kept</th><th>Contribution</th><th style="text-align:left">Kept from ₹100</th></tr></thead><tbody>${keepRows}</tbody></table></div>`;
+
+  const dl=(l,v,o='')=>`<div class="${o}"><dt>${l}</dt><dd class="${o.includes('neg')?'neg':''}">${v}</dd></div>`;
+  const neg=v=>'−'+money(Math.abs(v)).replace('−','');
+  const foodLbl=S.foodMode==='pct'?'Food cost ('+n(S.foodPct)+'% of payout)':'Food cost (share of purchases)';
+  const bdCounter=`<div class="card flat bd"><h3>Counter (dine-in &amp; takeaway)</h3><dl>${dl('Sales',money(r.counter))}${dl(S.foodMode==='pct'?'Food cost ('+n(S.foodPct)+'%)':'Food cost (share of purchases)',neg(r.counterFood),'neg')}${dl('Contribution',money(r.counterContrib),'strong')}</dl></div>`;
+  const bd=r.chs.map(c=>`<div class="card flat bd"><h3>${esc(c.name)}</h3><dl>${dl('Sales (incl. GST)',money(c.sales))}${c.mode==='pct'?dl('GST paid to govt by app',neg(c.gst),'neg')+dl('Commission',neg(c.comm),'neg')+dl('Payment fee',neg(c.payfee),'neg')+dl('GST on fees',neg(c.gstf),'neg')+dl('TDS',neg(c.tds),'neg')+(c.offers?dl('Offers, ads &amp; charges',neg(c.offers),'neg'):''):dl('Fees &amp; deductions',neg(c.ded),'neg')}${dl('Net payout',money(c.payout),'strong')}${dl(foodLbl,neg(c.food),'neg')}${dl('Contribution',money(c.contrib),'strong')}</dl></div>`).join('');
+
+  R.innerHTML=`
+  <section class="hero">
+    <div class="hero-top"><span class="eyebrow">Net profit${S.period?' · '+esc(S.period):''}</span><span class="pill ${tone}">${chip}</span></div>
+    <div class="hero-num num">${money(r.net)}</div>
+    <div class="hero-sub">${pct(r.netMargin)} of revenue · contribution margin ${pct(r.cm*100)}</div>
+    <p class="hero-msg">${esc(msg)}</p>
+    <div class="hero-meta">
+      <div><small>Break-even sales</small><b class="num">${r.beSales!==null?money(r.beSales):'—'}</b></div>
+      <div><small>Cushion</small><b class="num">${cushion!==null?pct(cushion,0):'—'}</b></div>
+      <div><small>Orders / day for target</small><b class="num">${tgt&&r.reqPerDay!==null?nf.format(r.reqPerDay):'—'}</b></div>
+    </div>
+  </section>
+  <section class="tiles">
+    <div class="tile"><small>Total revenue</small><b class="num">${money(r.revenue)}</b><span>payout ${money(r.payoutTotal)}</span></div>
+    <div class="tile ${fs.tone==='info'?'':fs.tone}"><small>Food cost</small><b class="num">${money(r.food)}</b><span>${pct(r.foodPctNet,0)}${fs.t?' · '+fs.t.split(',')[0]:''}</span></div>
+    <div class="tile"><small>App deductions</small><b class="num">${money(r.appDed)}</b><span>incl. GST paid by the apps</span></div>
+    <div class="tile"><small>Overheads</small><b class="num">${money(r.over)}</b><span>${pct(per(r.over))} of revenue</span></div>
+  </section>
+  <section class="card"><h2 class="sec-h">Where every ₹100 of sales goes</h2>
+    <div class="splitbar" role="img" aria-label="Split of revenue into app deductions, food cost, overheads and profit">${bar}</div><div class="legend">${legend}</div>
+    ${r.net<0?'<p class="note">Costs exceed revenue, so there is no profit slice. The shortfall is '+money(-r.net)+'.</p>':''}
+  </section>
+  <section class="card"><h2 class="sec-h">Insights</h2><p class="sub">Based on the numbers you entered.</p><div class="ins-grid">${insHtml}</div></section>
+  <section class="card"><h2 class="sec-h">What each channel keeps for you</h2><p class="sub">From every ₹100 of sales, after the app's cut and food cost.</p>${keep}</section>
+  <div class="two-col">
+    <section class="card"><h2 class="sec-h" style="margin-bottom:6px">P&amp;L summary</h2>${pl}</section>
+    <section class="card"><h2 class="sec-h" style="margin-bottom:6px">To reach your target</h2>${target}</section>
+  </div>
+  <section><h2 class="sec-h" style="margin:4px 0 12px">Channel breakdown</h2><div class="bd-grid">${bdCounter}${bd}</div></section>`;
+  return r;
+}
+
+function update(){renderResults()}
+
+/* ---------- events ---------- */
+const inputs=$('#inputs');
+inputs.addEventListener('input',e=>{
+  const t=e.target,d=t.dataset;if(d.f===undefined)return;
+  const val=d.text?t.value:n(t.value);
+  if(d.scope==='root')S[d.f]=val;
+  else if(d.scope==='ch'){const c=S.channels.find(x=>x.id===d.id);if(c){c[d.f]=val;
+    if(['comm','pay','gstf','tds'].includes(d.f)){const fl=t.closest('.stack').querySelector('.feeline');if(fl)fl.firstChild.nodeValue=`Commission ${n(c.comm)}% · payment fee ${n(c.pay)}% · GST on fees ${n(c.gstf)}% · TDS ${n(c.tds)}% `}}}
+  else if(d.scope==='oh'){const o=S.overheads.find(x=>x.id===d.id);if(o)o[d.f]=val}
+  update();
+});
+inputs.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act,id=b.dataset.id,c=S.channels.find(x=>x.id===id);
+  let focus=null;
+  if(a==='mode'&&c)c.mode=b.dataset.v;
+  else if(a==='edit'&&c)c.open=!c.open;
+  else if(a==='rm-ch')S.channels=S.channels.filter(x=>x.id!==id);
+  else if(a==='add-ch'){const nc=mkCh(b.dataset.key);S.channels.push(nc);focus=nc.id+'-sales'}
+  else if(a==='food')S.foodMode=b.dataset.v;
+  else if(a==='add-oh'){const o={id:nid(),name:'',amt:0,fixed:false};S.overheads.push(o);focus=o.id+'-n'}
+  else if(a==='rm-oh')S.overheads=S.overheads.filter(x=>x.id!==id);
+  else if(a==='clear')S=blank();
+  else if(a==='example')S=example();
+  else return;
+  renderInputs(focus);update();
+});
+
+/* ---------- toast + copy ---------- */
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3200)}
+function summaryText(r,m,m1f,nl){
+  const L=[];const head=(S.name||'Restaurant')+(S.period?' - '+S.period:'');
+  L.push(head+' profit / loss');
+  L.push('Net profit: '+m(r.net)+' ('+pct(r.netMargin)+' of revenue)');
+  L.push('Total revenue: '+m(r.revenue)+' | Net payout: '+m(r.payoutTotal));
+  L.push('App deductions: '+m(r.appDed)+' | Food cost: '+m(r.food)+' ('+pct(r.foodPctNet,0)+') | Overheads: '+m(r.over));
+  if(r.target>0)L.push('Target profit: '+m(r.target)+(r.reqPerDay?' | Orders needed per day: '+r.reqPerDay:''));
+  L.push('');L.push('Insights');
+  insights(r,S,m,m1f).forEach(i=>L.push('- '+i.title+': '+i.text));
+  return L.join(nl||'\n');
+}
+$('#copyBtn').addEventListener('click',async()=>{
+  const r=calc(S);if(r.revenue<=0){toast('Enter your sales first.');return}
+  const txt=summaryText(r,money,m1);
+  try{await navigator.clipboard.writeText(txt);toast('Summary copied')}
+  catch(_){const w=$('#copywrap'),b=$('#copybox');b.value=txt;w.hidden=false;b.focus();b.select();toast('Copy was blocked. Select the text at the bottom.')}
+});
+
+/* ---------- PDF ---------- */
+let downloadsP=null;
+try{downloadsP=window.claude&&window.claude.use?window.claude.use('downloads'):Promise.resolve(null)}catch(_){downloadsP=Promise.resolve(null)}
+
+function buildPDF(r){
+  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:'mm',format:'a4',compress:true});
+  const W=210,M=14,CW=W-2*M;let y=0;
+  const C={ink:[21,25,54],muted:[91,98,133],line:[224,227,239],bar:[21,25,54],acc:[242,165,22],good:[19,128,90],goodS:[221,242,233],bad:[192,40,58],badS:[251,224,227],warn:[180,84,10],soft:[245,246,251],white:[255,255,255],app:[224,138,46],food:[194,69,106],over:[74,85,194],prof:[31,163,116]};
+  const tc=c=>d.setTextColor(c[0],c[1],c[2]),fc=c=>d.setFillColor(c[0],c[1],c[2]),dc=c=>d.setDrawColor(c[0],c[1],c[2]);
+  const P=pmoney;
+  const ensure=h=>{if(y+h>278){d.addPage();y=18}};
+  // header band
+  fc(C.bar);d.rect(0,0,W,36,'F');fc(C.acc);d.rect(0,36,W,1.6,'F');
+  fc(C.acc);d.roundedRect(M,10,11,11,2.4,2.4,'F');tc([42,29,0]);d.setFont('helvetica','bold');d.setFontSize(12);d.text('Rs',M+5.5,17.4,{align:'center'});
+  tc(C.white);d.setFontSize(19);d.text('Profit / Loss Report',M+15,16.8);
+  d.setFont('helvetica','normal');d.setFontSize(10);tc([183,190,234]);
+  d.text(((S.name||'My restaurant')+(S.period?'  |  '+S.period:'')),M+15,23.5);
+  d.text('Generated '+new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}),W-M,23.5,{align:'right'});
+  y=46;
+  // KPI boxes
+  const kp=[['NET PROFIT',P(r.net),r.net>=0?C.good:C.bad,r.net>=0?C.goodS:C.badS,pct(r.netMargin)+' of revenue'],['TOTAL REVENUE',P(r.revenue),C.ink,C.soft,'payout '+P(r.payoutTotal)],['FOOD COST',P(r.food),C.ink,C.soft,pct(r.foodPctNet,0)+' of net payout'],['APP DEDUCTIONS',P(r.appDed),C.ink,C.soft,'incl. GST paid by apps']];
+  const bw=(CW-3*4)/4;
+  kp.forEach((k,i)=>{const x=M+i*(bw+4);fc(k[3]);d.roundedRect(x,y,bw,22,2.5,2.5,'F');
+    d.setFont('helvetica','bold');d.setFontSize(6.8);tc(C.muted);d.text(k[0],x+3.5,y+6);
+    d.setFontSize(13);tc(k[2]);d.text(k[1],x+3.5,y+13.5);
+    d.setFont('helvetica','normal');d.setFontSize(7.5);tc(C.muted);d.text(k[4],x+3.5,y+19)});
+  y+=29;
+  // status
+  const tgt=r.target>0;let msg,mc;
+  if(r.net<0){msg='Loss of '+P(-r.net)+' this period.';mc=C.bad}
+  else if(!tgt||r.net>=r.target){msg=tgt?'Profitable and at or above the target of '+P(r.target)+'.':'Profitable this period.';mc=C.good}
+  else{msg='Profitable, but '+P(r.target-r.net)+' short of the '+P(r.target)+' target.';mc=C.warn}
+  d.setFont('helvetica','bold');d.setFontSize(10.5);tc(mc);d.text(msg,M,y);y+=4;
+  if(r.beSales!==null){d.setFont('helvetica','normal');d.setFontSize(9);tc(C.muted);
+    d.text('Break-even sales '+P(r.beSales)+' a month  |  Contribution margin '+pct(r.cm*100)+'  |  Net margin '+pct(r.netMargin),M,y+2);y+=6}
+  y+=4;
+  const sec=t=>{ensure(14);d.setFont('helvetica','bold');d.setFontSize(11.5);tc(C.ink);d.text(t,M,y);y+=2.4;fc(C.acc);d.rect(M,y,10,0.9,'F');y+=6};
+  // split bar
+  sec('Where every Rs 100 of sales goes');
+  const segs=[['App deductions',r.appDed,C.app],['Food cost',r.food,C.food],['Overheads',r.over,C.over],['Profit',Math.max(r.net,0),C.prof]];
+  const tot=segs.reduce((a,x)=>a+Math.max(x[1],0),0)||1;let x=M;
+  segs.forEach(sg=>{const w=Math.max(sg[1],0)/tot*CW;if(w>0){fc(sg[2]);d.rect(x,y,w,6,'F');x+=w}});
+  y+=11;const lw=CW/4;
+  segs.forEach((sg,i)=>{const lx=M+i*lw;fc(sg[2]);d.rect(lx,y-2.8,3,3,'F');d.setFont('helvetica','normal');d.setFontSize(8);tc(C.muted);d.text(sg[0],lx+4.5,y);
+    d.setFont('helvetica','bold');d.setFontSize(10);tc(C.ink);d.text('Rs '+nf1.format(sg[0]==='Profit'?div(r.net,r.revenue)*100:div(sg[1],r.revenue)*100),lx+4.5,y+5)});
+  y+=14;
+  // channel table
+  sec('What each channel keeps for you');
+  const cx=[M,M+78,M+106,M+138,M+CW];
+  d.setFont('helvetica','bold');d.setFontSize(7.5);tc(C.muted);
+  d.text('CHANNEL',cx[0],y);['SALES','APP KEPT','CONTRIBUTION','KEPT FROM RS 100'].forEach((h,i)=>d.text(h,cx[i+1],y,{align:'right'}));
+  dc(C.line);d.line(M,y+2,M+CW,y+2);y+=6.5;
+  r.rows.forEach(rw=>{ensure(8);d.setFont('helvetica','normal');d.setFontSize(9.5);tc(C.ink);
+    d.text(rw.name,cx[0],y);d.text(P(rw.sales),cx[1],y,{align:'right'});
+    tc(rw.ded?C.bad:C.muted);d.text(rw.ded?'-'+P(rw.ded).replace('-',''):'-',cx[2],y,{align:'right'});
+    tc(C.ink);d.text(P(rw.contrib),cx[3],y,{align:'right'});d.setFont('helvetica','bold');d.text('Rs '+nf1.format(rw.keep),cx[4],y,{align:'right'});
+    dc(C.line);d.line(M,y+2.4,M+CW,y+2.4);y+=7.4});
+  y+=6;
+  // P&L
+  const row=(l,p,a,o={})=>{ensure(7.4);
+    if(o.fill){fc(o.fill);d.roundedRect(M,y-4.8,CW,7.2,1.4,1.4,'F')}
+    d.setFont('helvetica',o.bold?'bold':'normal');d.setFontSize(o.fill?10.5:9.5);tc(o.color||C.ink);
+    d.text(l,M+(o.ind?4:0)+(o.fill?2.5:0),y);
+    if(p!==null){d.setFont('helvetica','normal');d.setFontSize(8.5);tc(o.fill?(o.color||C.ink):C.muted);d.text(pct(p),M+CW-48,y,{align:'right'})}
+    d.setFont('helvetica',o.bold?'bold':'normal');d.setFontSize(o.fill?10.5:9.5);tc(o.neg?C.bad:(o.color||C.ink));
+    d.text((o.neg&&a>0?'-':'')+P(o.neg?Math.abs(a):a),M+CW-(o.fill?2.5:0),y,{align:'right'});
+    if(!o.fill){dc(C.line);d.line(M,y+2.4,M+CW,y+2.4)}y+=7.4};
+  const grp=t=>{ensure(10);d.setFont('helvetica','bold');d.setFontSize(7.5);tc(C.muted);d.text(t.toUpperCase(),M,y+1);y+=6};
+  sec('P&L summary');
+  const per=v=>div(v,r.revenue)*100;
+  grp('Revenue');
+  row('Counter (dine-in & takeaway)',per(r.counter),r.counter,{ind:1});r.chs.forEach(c=>row(c.name,per(c.sales),c.sales,{ind:1}));
+  row('Total revenue',100,r.revenue,{bold:1});
+  if(r.chs.length){grp('App deductions');r.chs.forEach(c=>row(c.name,div(c.ded,c.sales)*100,c.ded,{ind:1,neg:1}));row('Total app deductions',div(r.appDed,r.appSales)*100,r.appDed,{bold:1,neg:1})}
+  row('Net payout',per(r.payoutTotal),r.payoutTotal,{bold:1});row('Food cost',r.foodPctNet,r.food,{ind:1,neg:1});row('Contribution',per(r.contrib),r.contrib,{bold:1});
+  grp('Overheads');S.overheads.forEach(o=>row(o.name||'Expense',per(n(o.amt)),n(o.amt),{ind:1,neg:1}));row('Total overheads',per(r.over),r.over,{bold:1,neg:1});
+  y+=2;row('Net profit / loss',r.netMargin,r.net,{bold:1,fill:r.net>=0?C.goodS:C.badS,color:r.net>=0?C.good:C.bad});
+  d.setFont('helvetica','normal');d.setFontSize(7.8);tc(C.muted);
+  d.text('% column: share of total revenue. App deductions show the share of that app\'s own sales; food cost is on net payout.',M,y+3);y+=11;
+  // target
+  if(r.target>0){
+    sec('To reach your target');
+    const kv=(l,v)=>{ensure(7.4);d.setFont('helvetica','normal');d.setFontSize(9.5);tc(C.ink);d.text(l,M,y);d.setFont('helvetica','bold');d.text(v,M+CW,y,{align:'right'});dc(C.line);d.line(M,y+2.4,M+CW,y+2.4);y+=7.4};
+    kv('Target profit',P(r.target));kv('Required contribution (overheads + target)',P(r.reqContrib));
+    kv('Required sales / month',r.reqSales!==null?P(r.reqSales):'-');kv('Required orders / month',r.reqOrders!==null?nf.format(r.reqOrders):'-');kv('Required orders / day',r.reqPerDay!==null?nf.format(r.reqPerDay):'-');
+    y+=6;
+  }
+  // insights
+  const ins=insights(r,S,pmoney,pm1);
+  if(ins.length){
+    sec('Insights');
+    ins.forEach(i=>{
+      const lines=d.splitTextToSize(i.text,CW-2),h=6.5+lines.length*4.3+3.5;ensure(h);
+      d.setFont('helvetica','bold');d.setFontSize(9.5);tc(C.ink);d.text(i.title,M,y);
+      const col=i.tone==='good'?C.good:i.tone==='warn'?C.warn:i.tone==='bad'?C.bad:C.over;
+      d.setFontSize(7.5);tc(col);d.text(TONE_LABEL[i.tone].toUpperCase(),M+CW,y,{align:'right'});
+      d.setFont('helvetica','normal');d.setFontSize(9);tc(C.muted);d.text(lines,M,y+5);y+=h;
+    });
+  }
+  const pages=d.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    d.setPage(p);dc(C.line);d.line(M,287,M+CW,287);d.setFont('helvetica','normal');d.setFontSize(7.5);tc(C.muted);
+    d.text('Estimates based on the figures entered. GST of 5% is assumed on app and delivery sales.',M,292);
+    d.text('Page '+p+' of '+pages,M+CW,292,{align:'right'});
+  }
+  return d;
+}
+
+$('#pdfBtn').addEventListener('click',async()=>{
+  const r=calc(S);if(r.revenue<=0){toast('Enter your sales first.');return}
+  const btn=$('#pdfBtn');btn.disabled=true;
+  try{
+    const dl=downloadsP?await downloadsP:null;
+    if(!dl){toast('PDF saving is not available in this view. Open the dashboard in claude.ai to save it.');return}
+    const doc=buildPDF(r);
+    const slug=((S.name||'restaurant')+' '+(S.period||'')).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    await dl.save({filename:slug+'-profit-loss.pdf',data:doc.output('arraybuffer')});
+    toast('PDF ready');
+  }catch(e){toast(e&&e.code==='declined'?'Download cancelled.':'Could not save the PDF ('+((e&&e.code)||'error')+').')}
+  finally{btn.disabled=false}
+});
+
+renderInputs();update();
+window.__calc=calc;window.__S=()=>S;
+})();
+</script>
+
+</body></html>
